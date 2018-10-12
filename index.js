@@ -45,6 +45,7 @@ export {
 };
 
 const keyboardTypeRegistry = {};
+const keyboardPropsRegistry = {};
 const defaultKeyboardHeight = 216
 
 export function register(type, keyboardInfo) {
@@ -54,6 +55,10 @@ const getKeyboardHeightByType = (type) => {
   const height = keyboardTypeRegistry[type].height
   return height || defaultKeyboardHeight
 }
+
+const getKeyboardProps = (tag) => keyboardPropsRegistry[tag] || null;
+const setKeyboardProps = (tag, props) => { keyboardPropsRegistry[tag] = props; };
+const removeKeyboardProps = (tag) => { delete keyboardPropsRegistry[tag] };
 
 class CustomKeyboardContainer extends Component {
   render() {
@@ -65,7 +70,7 @@ class CustomKeyboardContainer extends Component {
       return null;
     }
     const Comp = factory();
-    return <Comp tag={tag} inputFilter={inputFilter} />;
+    return <Comp tag={tag} inputFilter={inputFilter} keyboardProps={getKeyboardProps(tag)} />;
   }
 }
 
@@ -78,19 +83,32 @@ export class CustomTextInput extends Component {
   };
 
 
-  installKeyboard({ maxLength, customKeyboardType }) {
-    install(
-      findNodeHandle(this.input),
-      customKeyboardType,
-      maxLength === undefined ? 1024 : maxLength,
-      getKeyboardHeightByType(customKeyboardType)
-    );
+  installKeyboard({ maxLength, customKeyboardType, keyboardProps }) {
+    try {
+      const tag = findNodeHandle(this.input);
+      setKeyboardProps(tag, keyboardProps);
+
+      install(
+        tag,
+        customKeyboardType,
+        maxLength === undefined ? 1024 : maxLength,
+        getKeyboardHeightByType(customKeyboardType),
+      );
+    } catch(e) {}
   }
 
   componentDidMount() {
     // without this delay, the keyboard sometimes fails to install
     setTimeout(() => this.installKeyboard(this.props), 100)
   }
+
+  componentWillUnmount() {
+    try {
+      const tag = findNodeHandle(this.input);
+      removeKeyboardProps(tag);
+    } catch(e) {}
+  }
+
   componentWillReceiveProps(newProps) {
     if (this.props.customKeyboardType && newProps.customKeyboardType && newProps.customKeyboardType !== this.props.customKeyboardType) {
       this.installKeyboard(newProps);
@@ -107,4 +125,3 @@ export class CustomTextInput extends Component {
     return <TextInput {...others} keyboardType={'numeric'} ref={this.onRef} />;
   }
 }
-
